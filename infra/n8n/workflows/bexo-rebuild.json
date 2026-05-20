@@ -1,0 +1,45 @@
+{
+  "name": "BEXO — Rebuild (Workflow C)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "bexo-rebuild",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "webhook-rebuild",
+      "name": "Webhook rebuild",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "bexo-rebuild"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.N8N_WEBHOOK_URL }}bexo-portfolio-generate",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-BEXO-Secret", "value": "={{ $env.N8N_WEBHOOK_SECRET }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}"
+      },
+      "id": "forward",
+      "name": "Forward to generate workflow",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300],
+      "notes": "Alternatively duplicate Workflow A nodes here"
+    }
+  ],
+  "connections": {
+    "Webhook rebuild": { "main": [[{ "node": "Forward to generate workflow", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

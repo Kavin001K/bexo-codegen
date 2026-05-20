@@ -1,0 +1,258 @@
+{
+  "name": "BEXO — Portfolio Generate (Workflow A)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "bexo-portfolio-generate",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "bexo-portfolio-generate"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.headers['x-bexo-secret'] || $json.headers['X-BEXO-Secret'] }}",
+              "operation": "equals",
+              "value2": "={{ $env.N8N_WEBHOOK_SECRET }}"
+            }
+          ]
+        }
+      },
+      "id": "verify-secret",
+      "name": "Verify X-BEXO-Secret",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/site_builds?id=eq.{{ $('Webhook').item.json.body.buildId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_ROLE_KEY }}" },
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_ROLE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=minimal" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"status\": \"building\", \"build_log\": \"n8n: fetching profile\" }"
+      },
+      "id": "status-building",
+      "name": "Supabase — building",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 220]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/profiles?id=eq.{{ $('Webhook').item.json.body.profileId }}&select=*,projects(*),skills(*),experiences(*),education(*)",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_ROLE_KEY }}" },
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_ROLE_KEY }}" }
+          ]
+        }
+      },
+      "id": "fetch-profile",
+      "name": "Supabase — fetch profile",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 220]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.OPENROUTER_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "HTTP-Referer", "value": "https://mybexo.com" },
+            { "name": "X-Title", "value": "BEXO Portfolio Generate" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ (() => { const raw = $('Supabase — fetch profile').first().json; const profile = Array.isArray(raw) ? raw[0] : raw; return { model: $env.OPENROUTER_MODEL_SPEC || 'openrouter/free', max_tokens: 800, messages: [{ role: 'system', content: 'Analyze student profile JSON. Return JSON only with keys tone, palette_hint, section_order, emphasis. No markdown fences. No invented employers.' }, { role: 'user', content: 'Profile data:\\n' + JSON.stringify(profile) }] }; })() }}"
+      },
+      "id": "ai-personality",
+      "name": "OpenRouter — personality",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 220]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.OPENROUTER_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "HTTP-Referer", "value": "https://mybexo.com" },
+            { "name": "X-Title", "value": "BEXO Portfolio Generate" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ (() => { const raw = $('Supabase — fetch profile').first().json; const profile = Array.isArray(raw) ? raw[0] : raw; const personality = $json.choices && $json.choices[0] ? $json.choices[0].message.content : JSON.stringify($json); return { model: $env.OPENROUTER_MODEL_SPEC || 'openrouter/free', max_tokens: 3000, messages: [{ role: 'system', content: 'You are a portfolio architect. Output ONLY portfolio.md markdown with sections: # Identity, ## Personality, ## Style, ## Assets, ## About, ## Skills, ## Experience, ## Projects, ## Education, ## Contact. Use only facts from input. Include signed asset URLs when provided.' }, { role: 'user', content: 'Profile:\\n' + JSON.stringify(profile) + '\\n\\nPersonality analysis:\\n' + personality }] }; })() }}"
+      },
+      "id": "ai-spec",
+      "name": "OpenRouter — portfolio.md",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 220]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "portfolio_md",
+              "name": "portfolio_md",
+              "value": "={{ $json.choices[0].message.content }}",
+              "type": "string"
+            },
+            {
+              "id": "profileId",
+              "name": "profileId",
+              "value": "={{ $('Webhook').item.json.body.profileId }}",
+              "type": "string"
+            },
+            {
+              "id": "buildId",
+              "name": "buildId",
+              "value": "={{ $('Webhook').item.json.body.buildId }}",
+              "type": "string"
+            },
+            {
+              "id": "handle",
+              "name": "handle",
+              "value": "={{ (() => { const raw = $('Supabase — fetch profile').first().json; const p = Array.isArray(raw) ? raw[0] : raw; return (p && p.handle) ? String(p.handle).toLowerCase() : ''; })() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "extract-portfolio-md",
+      "name": "Extract portfolio.md",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1560, 220]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://storage.googleapis.com/upload/storage/v1/b/bexo-portfolios/o?uploadType=media&name={{ encodeURIComponent($json.profileId + '/portfolio.md') }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "text/markdown" }]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "text/markdown",
+        "body": "={{ $json.portfolio_md }}",
+        "options": {}
+      },
+      "id": "gcs-upload-portfolio",
+      "name": "GCS — upload portfolio.md",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1780, 220],
+      "credentials": {
+        "googleApi": {
+          "id": "",
+          "name": "BEXO GCS n8n"
+        }
+      },
+      "notes": "Uses Google Service Account credential (HTTP Request). See infra/n8n/GCS-UPLOAD-SETUP.md"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://bexo-codegen-901109516440.us-central1.run.app/build",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-BEXO-Internal-Secret", "value": "={{ $env.BEXO_INTERNAL_SECRET }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ (() => { const e = $('Extract portfolio.md').first().json; return { profileId: e.profileId, buildId: e.buildId, handle: e.handle }; })() }}",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "trigger-codegen",
+      "name": "Cloud Run — /build",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2000, 220],
+      "notes": "Codegen can take 2–5 min. Timeout 300s. Body reads Extract node (not GCS response). Cloud Run must use OPENROUTER_FREE_ONLY=true."
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/site_builds?id=eq.{{ $('Webhook').item.json.body.buildId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_ROLE_KEY }}" },
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_ROLE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"status\": \"failed\", \"build_log\": \"n8n error: \" + $json.message }"
+      },
+      "id": "status-failed",
+      "name": "Supabase — failed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 480]
+    }
+  ],
+  "connections": {
+    "Webhook": { "main": [[{ "node": "Verify X-BEXO-Secret", "type": "main", "index": 0 }]] },
+    "Verify X-BEXO-Secret": {
+      "main": [
+        [{ "node": "Supabase — building", "type": "main", "index": 0 }],
+        [{ "node": "Supabase — failed", "type": "main", "index": 0 }]
+      ]
+    },
+    "Supabase — building": { "main": [[{ "node": "Supabase — fetch profile", "type": "main", "index": 0 }]] },
+    "Supabase — fetch profile": { "main": [[{ "node": "OpenRouter — personality", "type": "main", "index": 0 }]] },
+    "OpenRouter — personality": { "main": [[{ "node": "OpenRouter — portfolio.md", "type": "main", "index": 0 }]] },
+    "OpenRouter — portfolio.md": { "main": [[{ "node": "Extract portfolio.md", "type": "main", "index": 0 }]] },
+    "Extract portfolio.md": { "main": [[{ "node": "GCS — upload portfolio.md", "type": "main", "index": 0 }]] },
+    "GCS — upload portfolio.md": { "main": [[{ "node": "Cloud Run — /build", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "meta": {
+    "description": "After import: on 'GCS — upload portfolio.md' select credential 'BEXO GCS n8n'. Delete old duplicate workflow before import. See infra/n8n/GCS-UPLOAD-SETUP.md"
+  }
+}

@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BEXO — Unified Build Guide</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Syne:wght@700;800&family=Instrument+Sans:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--void:#050508;--ink:#0d0d14;--panel:#13131d;--line:rgba(255,255,255,.08);
+--txt:#e8e6f0;--txt2:#9896b0;--txt3:#5e5c72;--hi:#6c5ce7;--hi2:#00cec9;--hi5:#55efc4;
+--warn:#fdcb6e;--mono:'IBM Plex Mono',monospace;--display:'Syne',sans-serif;--body:'Instrument Sans',sans-serif}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--void);color:var(--txt);font-family:var(--body);font-size:14px;line-height:1.6}
+#topbar{position:fixed;top:0;left:0;right:0;z-index:300;height:52px;background:rgba(5,5,8,.97);
+border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 20px;gap:16px}
+.tb-logo{font-family:var(--display);font-weight:800;font-size:15px}
+.tp-bar{flex:1;max-width:200px;height:4px;background:var(--line);border-radius:2px}
+.tp-fill{height:100%;background:linear-gradient(90deg,var(--hi),var(--hi2));width:0%;transition:.3s}
+.layout{display:flex;padding-top:52px;min-height:100vh}
+#sidebar{width:220px;background:var(--ink);border-right:1px solid var(--line);
+position:sticky;top:52px;height:calc(100vh - 52px);overflow-y:auto;padding:12px 0}
+.sb-item{display:flex;gap:10px;width:100%;padding:8px 16px;border:none;background:none;
+color:var(--txt3);cursor:pointer;text-align:left;font-size:12px;align-items:center}
+.sb-item.active,.sb-item:hover{color:var(--hi5);background:rgba(85,239,196,.06)}
+.sb-item[data-phase-status="done"] .si-num{background:rgba(85,239,196,.15);color:var(--hi5)}
+.sb-item[data-phase-status="partial"] .si-num{background:rgba(116,185,255,.12);color:#74b9ff}
+.si-num{font-family:var(--mono);font-size:10px;width:22px;height:22px;display:flex;align-items:center;
+justify-content:center;background:var(--panel);border-radius:4px;flex-shrink:0}
+#main{flex:1;overflow-y:auto}
+.hero{padding:48px 40px;background:var(--ink);border-bottom:1px solid var(--line)}
+.hero-title{font-family:var(--display);font-size:40px;font-weight:800;letter-spacing:-1px;margin:12px 0}
+.hero-sub{color:var(--txt2);max-width:720px}
+.hero-pill{display:inline-block;margin-top:12px;padding:6px 12px;border-radius:20px;font-family:var(--mono);
+font-size:11px;background:rgba(85,239,196,.1);color:var(--hi5);border:1px solid rgba(85,239,196,.25)}
+.flow-svg{width:100%;max-width:920px;margin:20px 0}
+.phase-header{padding:28px 40px 0}
+.ph-row{display:flex;align-items:center;gap:12px}
+.ph-eyebrow{font-family:var(--mono);font-size:10px;color:var(--hi2);letter-spacing:2px}
+.ph-badge{font-family:var(--mono);font-size:10px;padding:3px 10px;border-radius:12px;font-weight:600}
+.ph-badge-done{background:rgba(85,239,196,.15);color:var(--hi5)}
+.ph-badge-partial{background:rgba(116,185,255,.12);color:#74b9ff}
+.ph-badge-pending{background:rgba(253,203,110,.12);color:var(--warn)}
+.ph-badge-active{background:rgba(108,92,231,.2);color:#a29bfe}
+.sb-item[data-phase-status="active"] .si-num{background:rgba(108,92,231,.2);color:#a29bfe}
+.ph-title{font-family:var(--display);font-size:26px;font-weight:800;margin:6px 0}
+.ph-desc{color:var(--txt2)}
+.ph-status-note{font-family:var(--mono);font-size:11px;color:var(--txt3);margin-top:8px}
+.steps-container{padding:20px 40px 32px}
+.checklist{margin-top:16px}
+.check-item{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);align-items:flex-start}
+.cb{width:18px;height:18px;border:1.5px solid rgba(255,255,255,.2);border-radius:4px;cursor:pointer;flex-shrink:0;margin-top:2px}
+.cb.checked{background:var(--hi5);border-color:var(--hi5)}
+.cb.checked::after{content:'\2713';display:block;text-align:center;font-size:11px;color:#000;font-weight:700;line-height:16px}
+.ci-text{flex:1}
+.ci-text.checked{color:var(--txt3);text-decoration:line-through}
+.ci-cat{font-family:var(--mono);font-size:9px;color:var(--txt3);padding:2px 6px;background:var(--panel);border-radius:4px}
+.terminal{background:#02020a;border:1px solid #1e1c35;border-radius:8px;margin:16px 0;overflow:hidden}
+.t-bar{display:flex;justify-content:space-between;padding:8px 14px;background:#0f0e1e;font-family:var(--mono);font-size:11px;color:var(--txt3)}
+.t-body{padding:16px;font-family:var(--mono);font-size:12px;white-space:pre-wrap;color:#c8c6e0;margin:0}
+.t-copy{background:var(--panel);border:1px solid var(--line);color:var(--txt3);padding:2px 8px;border-radius:4px;cursor:pointer}
+.nav-buttons{display:flex;gap:12px;padding:0 40px 40px}
+.nav-btn{padding:10px 18px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--txt);cursor:pointer}
+.nav-btn.primary{background:var(--hi5);color:#000;border-color:var(--hi5);font-weight:600}
+.toolbar{padding:12px 40px;display:flex;gap:8px;flex-wrap:wrap}
+.filter-btn{padding:4px 12px;border-radius:20px;border:1px solid var(--line);background:transparent;color:var(--txt2);cursor:pointer;font-size:11px;font-family:var(--mono)}
+.filter-btn.active{border-color:var(--hi);color:var(--hi)}
+.callout{border-left:3px solid var(--hi);padding:12px 16px;margin:16px 40px;background:rgba(108,92,231,.08);color:var(--txt2);font-size:13px}
+.callout-next{border-left-color:var(--warn);background:rgba(253,203,110,.06)}
+.callout code{font-family:var(--mono);font-size:12px;color:var(--hi5)}
+@media(max-width:800px){#sidebar{display:none}}
+</style>
+</head>
+<body>
+<div id="topbar">
+  <div class="tb-logo">BEXO / Unified Build Guide</div>
+  <div class="tp-bar"><div id="tp-fill" class="tp-fill"></div></div>
+  <span id="tp-text" style="font-family:var(--mono);font-size:11px;color:var(--txt3)">0%</span>
+  <button class="t-copy" onclick="exportProgress()">Export</button>
+  <button class="t-copy" onclick="applyBaseline()">Reset baseline</button>
+</div>
+<div class="layout">
+<nav id="sidebar"><button class="sb-item active" onclick="goPhase(0)" data-phase-status="partial"><span class="si-num">00</span><span>Prerequisites</span></button>
+<button class="sb-item" onclick="goPhase(1)" data-phase-status="done"><span class="si-num">01</span><span>GCP Foundation</span></button>
+<button class="sb-item" onclick="goPhase(2)" data-phase-status="done"><span class="si-num">02</span><span>n8n VM</span></button>
+<button class="sb-item" onclick="goPhase(3)" data-phase-status="done"><span class="si-num">03</span><span>n8n Workflows</span></button>
+<button class="sb-item" onclick="goPhase(4)" data-phase-status="done"><span class="si-num">04</span><span>Cloud Run Codegen</span></button>
+<button class="sb-item" onclick="goPhase(5)" data-phase-status="pending"><span class="si-num">05</span><span>GitHub</span></button>
+<button class="sb-item" onclick="goPhase(6)" data-phase-status="done"><span class="si-num">06</span><span>Hosting</span></button>
+<button class="sb-item" onclick="goPhase(7)" data-phase-status="done"><span class="si-num">07</span><span>DNS + build-done</span></button>
+<button class="sb-item" onclick="goPhase(8)" data-phase-status="active"><span class="si-num">08</span><span>Wire BEXO App</span></button>
+<button class="sb-item" onclick="goPhase(9)" data-phase-status="pending"><span class="si-num">09</span><span>Hardening</span></button></nav>
+<main id="main">
+<div class="hero">
+  <div style="font-family:var(--mono);font-size:11px;color:var(--hi5)">● Updated 2026-05-20</div>
+  <h1 class="hero-title">Automated portfolio factory</h1>
+  <p class="hero-sub"><strong>Done (Phases 1–7):</strong> Live portfolios at https://{handle}.mybexo.com (Worker + KV + GCS).
+  <strong>Now (Phase 8):</strong> Wire BEXO app webhooks — docs/PHASE-8-SETUP.md.
+  <strong>Optional:</strong> Phase 5 GitHub org, Phase 9 hardening.</p>
+  <span class="hero-pill">Baseline: 37 / 56 steps verified</span>
+</div>
+<div class="callout">Log: <code>docs/BUILD_PROGRESS.md</code> · Cloud Run: <code>bexo-codegen-901109516440.us-central1.run.app</code></div>
+<div class="toolbar">
+  <button class="filter-btn active" data-filter="all" onclick="setFilter('all')">All</button>
+  <button class="filter-btn" data-filter="gcp" onclick="setFilter('gcp')">GCP</button>
+  <button class="filter-btn" data-filter="n8n" onclick="setFilter('n8n')">n8n</button>
+  <button class="filter-btn" data-filter="codegen" onclick="setFilter('codegen')">Codegen</button>
+  <button class="filter-btn" data-filter="dns" onclick="setFilter('dns')">DNS</button>
+</div>
+<section class="phase-section" id="phase-0" style="display:block">
+  <div class="phase-header">
+    <div class="ph-row">
+      <div class="ph-eyebrow">Phase 00</div>
+      <span class="ph-badge ph-badge-partial">Partial</span>
+    </div>
+    <div class="ph-title">Prerequisites</div>
+    <div class="ph-desc">App, Supabase, domain, billing</div>
+    <div class="ph-status-note">Supabase + billing done; confirm app + Cloudflare</div>
+  </div>
+  
+  <div class="steps-container">
+    <div class="checklist"><div class="check-item" data-id="p0-1" data-cat="gcp" data-phase="0"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">BEXO mobile app builds and onboarding completes</div><span class="ci-cat">gcp</span></div>
+<div class="check-item" data-id="p0-2" data-cat="gcp" data-phase="0"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">Supabase project live with migrations applied</div><span class="ci-cat">gcp</span></div>
+<div class="check-item" data-id="p0-3" data-cat="gcp" data-phase="0"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">Domain mybexo.com on Cloudflare</div><span class="ci-cat">gcp</span></div>
+<div class="check-item" data-id="p0-4" data-cat="gcp" data-phase="0"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">GCP billing linked to bexo-prod</div><span class="ci-cat">gcp</span></div></div>
+  </div>
+  <div class="nav-buttons">
+    <button class="nav-btn primary" onclick="goPhase(1)">Next →</button>
+  </div>
+</section>
+<section class="phase-section" id="phase-1" style="display:none">
+  <div class="phase-header">
+    <div class="ph-row">
+      <div class="ph-eyebrow">Phase 01</div>
+      <span class="ph-badge ph-badge-done">Complete</span>
+    </div>
+    <div class="ph-title">GCP Foundation</div>
+    <div class="ph-desc">APIs, secrets, bucket, service accounts</div>
+    <div class="ph-status-note">bexo-prod foundation complete</div>
+  </div>
+  
+  <div class="steps-container"><div class="terminal"><div class="t-bar"><span class="t-bar-title">Commands</span><button class="t-copy" onclick="copyBlock(this)">copy</button></div><pre class="t-body">gcloud config set project bexo-prod
+chmod +x infra/gcp/setup-foundation.sh && ./infra/gcp/setup-foundation.sh</pre></div>
+    <div class="checklist"><div class="check-item" data-id="p1-1" data-cat="gcp" data-phase="1"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">gcloud project set to bexo-prod</div><span class="ci-cat">gcp</span></div>
+<div class="check-item" data-id="p1-2" data-cat="gcp" data-phase="1"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">All required APIs enabled</div><span class="ci-cat">gcp</span></div>
+<div class="check-item" data-id="p1-3" data-cat="gcp" data-phase="1"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">Secret Manager: deepseek-api-key (optional)</div><span class="ci-cat">gcp</span></div>
+<div class="check-item" data-id="p1-3b" data-cat="gcp" data-phase="1"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">Secret Manager: kimi-api-key (optional)</div><span class="ci-cat">gcp</span></div>
+<div class="check-item" data-id="p1-3c" data-cat="gcp" data-phase="1"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">Secret Manager: openrouter-api-key</div><span class="ci-cat">gcp</span></div>
+<div class="check-item" data-id="p1-4" data-cat="gcp" data-phase="1"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">Secret Manager: github-token</div><span class="ci-cat">gcp</span></div>
+<div class="check-item" data-id="p1-5" data-cat="gcp" data-phase="1"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">Secret Manager: cloudflare-token + zone-id (Phase 7)</div><span class="ci-cat">gcp</span></div>
+<div class="check-item" data-id="p1-6" data-cat="gcp" data-phase="1"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">Secret Manager: supabase-url + service key</div><span class="ci-cat">gcp</span></div>
+<div class="check-item" data-id="p1-7" data-cat="gcp" data-phase="1"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">Secret Manager: bexo-internal-secret</div><span class="ci-cat">gcp</span></div>
+<div class="check-item" data-id="p1-8" data-cat="gcp" data-phase="1"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">GCS bucket bexo-portfolios created</div><span class="ci-cat">gcp</span></div>
+<div class="check-item" data-id="p1-9" data-cat="gcp" data-phase="1"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">Service account bexo-codegen + IAM</div><span class="ci-cat">gcp</span></div>
+<div class="check-item" data-id="p1-10" data-cat="gcp" data-phase="1"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">Service account n8n-invoker + run.invoker</div><span class="ci-cat">gcp</span></div>
+<div class="check-item" data-id="p1-11" data-cat="gcp" data-phase="1"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">Ran infra/gcp/setup-foundation.sh successfully</div><span class="ci-cat">gcp</span></div></div>
+  </div>
+  <div class="nav-buttons"><button class="nav-btn" onclick="goPhase(0)">← Previous</button>
+    <button class="nav-btn primary" onclick="goPhase(2)">Next →</button>
+  </div>
+</section>
+<section class="phase-section" id="phase-2" style="display:none">
+  <div class="phase-header">
+    <div class="ph-row">
+      <div class="ph-eyebrow">Phase 02</div>
+      <span class="ph-badge ph-badge-done">Complete</span>
+    </div>
+    <div class="ph-title">n8n VM</div>
+    <div class="ph-desc">docker-compose.micro.yml, SSL, env</div>
+    <div class="ph-status-note">n8n VM + micro stack operational</div>
+  </div>
+  
+  <div class="steps-container"><div class="terminal"><div class="t-bar"><span class="t-bar-title">Commands</span><button class="t-copy" onclick="copyBlock(this)">copy</button></div><pre class="t-body">gcloud compute ssh bexo-n8n --zone=us-central1-a --project=bexo-prod
+cd ~/bexo-n8n && docker compose -f docker-compose.micro.yml up -d
+bash recover-n8n.sh</pre></div>
+    <div class="checklist"><div class="check-item" data-id="p2-1" data-cat="n8n" data-phase="2"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">GCE VM bexo-n8n running (e2-micro)</div><span class="ci-cat">n8n</span></div>
+<div class="check-item" data-id="p2-2" data-cat="n8n" data-phase="2"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">docker-compose.micro.yml — Postgres + n8n healthy</div><span class="ci-cat">n8n</span></div>
+<div class="check-item" data-id="p2-3" data-cat="n8n" data-phase="2"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">https://n8n.mybexo.com loads with SSL</div><span class="ci-cat">n8n</span></div>
+<div class="check-item" data-id="p2-4" data-cat="n8n" data-phase="2"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">n8n basic auth + N8N_ENCRYPTION_KEY set</div><span class="ci-cat">n8n</span></div>
+<div class="check-item" data-id="p2-5" data-cat="n8n" data-phase="2"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">N8N_BLOCK_ENV_ACCESS_IN_NODE=false + recover-n8n.sh tested</div><span class="ci-cat">n8n</span></div>
+<div class="check-item" data-id="p2-6" data-cat="n8n" data-phase="2"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">Optional: Redis + worker queue (not used on micro stack)</div><span class="ci-cat">n8n</span></div></div>
+  </div>
+  <div class="nav-buttons"><button class="nav-btn" onclick="goPhase(1)">← Previous</button>
+    <button class="nav-btn primary" onclick="goPhase(3)">Next →</button>
+  </div>
+</section>
+<section class="phase-section" id="phase-3" style="display:none">
+  <div class="phase-header">
+    <div class="ph-row">
+      <div class="ph-eyebrow">Phase 03</div>
+      <span class="ph-badge ph-badge-done">Complete</span>
+    </div>
+    <div class="ph-title">n8n Workflows</div>
+    <div class="ph-desc">Workflow A — free OpenRouter + GCS + Cloud Run</div>
+    <div class="ph-status-note">Workflow A E2E — OpenRouter → GCS → Cloud Run 200</div>
+  </div>
+  
+  <div class="steps-container"><div class="terminal"><div class="t-bar"><span class="t-bar-title">Commands</span><button class="t-copy" onclick="copyBlock(this)">copy</button></div><pre class="t-body">curl -X POST "https://n8n.mybexo.com/webhook/bexo-portfolio-generate" \
+  -H "Content-Type: application/json" \
+  -H "X-BEXO-Secret: YOUR_SECRET" \
+  -d '{"profileId":"UUID","buildId":"UUID","triggered_by":"test"}'</pre></div>
+    <div class="checklist"><div class="check-item" data-id="p3-1" data-cat="n8n" data-phase="3"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">Workflow A imported + published (bexo-portfolio-generate)</div><span class="ci-cat">n8n</span></div>
+<div class="check-item" data-id="p3-2" data-cat="n8n" data-phase="3"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">Workflow B imported (bexo-build-done — activate Phase 7)</div><span class="ci-cat">n8n</span></div>
+<div class="check-item" data-id="p3-3" data-cat="n8n" data-phase="3"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">Optional: bexo-rebuild workflow imported</div><span class="ci-cat">n8n</span></div>
+<div class="check-item" data-id="p3-4" data-cat="n8n" data-phase="3"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">Supabase env on VM (SUPABASE_URL + service role key)</div><span class="ci-cat">n8n</span></div>
+<div class="check-item" data-id="p3-5" data-cat="n8n" data-phase="3"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">OpenRouter free (OPENROUTER_API_KEY + openrouter/free)</div><span class="ci-cat">n8n</span></div>
+<div class="check-item" data-id="p3-6" data-cat="n8n" data-phase="3"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">GCS credential + upload writes portfolio.md</div><span class="ci-cat">n8n</span></div>
+<div class="check-item" data-id="p3-7" data-cat="n8n" data-phase="3"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">BEXO_INTERNAL_SECRET + Cloud Run URL in workflow</div><span class="ci-cat">n8n</span></div>
+<div class="check-item" data-id="p3-8" data-cat="n8n" data-phase="3"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">Test webhook returns 200</div><span class="ci-cat">n8n</span></div>
+<div class="check-item" data-id="p3-9" data-cat="n8n" data-phase="3"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">Workflow A E2E: all nodes green incl. Cloud Run /build</div><span class="ci-cat">n8n</span></div></div>
+  </div>
+  <div class="nav-buttons"><button class="nav-btn" onclick="goPhase(2)">← Previous</button>
+    <button class="nav-btn primary" onclick="goPhase(4)">Next →</button>
+  </div>
+</section>
+<section class="phase-section" id="phase-4" style="display:none">
+  <div class="phase-header">
+    <div class="ph-row">
+      <div class="ph-eyebrow">Phase 04</div>
+      <span class="ph-badge ph-badge-done">Complete</span>
+    </div>
+    <div class="ph-title">Cloud Run Codegen</div>
+    <div class="ph-desc">Deploy + /build E2E verified</div>
+    <div class="ph-status-note">Codegen deployed; HTML in GCS bucket</div>
+  </div>
+  <div class="callout callout-next"><strong>Next:</strong> Phases 5–7 done for MVP hosting; optional GitHub org (Phase 5).</div>
+  <div class="steps-container"><div class="terminal"><div class="t-bar"><span class="t-bar-title">Commands</span><button class="t-copy" onclick="copyBlock(this)">copy</button></div><pre class="t-body">gcloud builds submit --config=cloudbuild.yaml --project=bexo-prod .
+# https://bexo-codegen-901109516440.us-central1.run.app</pre></div>
+    <div class="checklist"><div class="check-item" data-id="p4-1" data-cat="codegen" data-phase="4"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">tester.py + github_push.py + mobile_safety.py</div><span class="ci-cat">codegen</span></div>
+<div class="check-item" data-id="p4-2" data-cat="codegen" data-phase="4"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">Cloud Build deploys image (cloudbuild.yaml)</div><span class="ci-cat">codegen</span></div>
+<div class="check-item" data-id="p4-3" data-cat="codegen" data-phase="4"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">Cloud Run live — /build secret-gated, /health public</div><span class="ci-cat">codegen</span></div>
+<div class="check-item" data-id="p4-4" data-cat="codegen" data-phase="4"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">Secrets on Cloud Run (OPENROUTER_FREE_ONLY=true)</div><span class="ci-cat">codegen</span></div>
+<div class="check-item" data-id="p4-5" data-cat="codegen" data-phase="4"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">GET /health returns ok</div><span class="ci-cat">codegen</span></div>
+<div class="check-item" data-id="p4-6" data-cat="codegen" data-phase="4"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">POST /build returns 200 — site/index.html in GCS</div><span class="ci-cat">codegen</span></div></div>
+  </div>
+  <div class="nav-buttons"><button class="nav-btn" onclick="goPhase(3)">← Previous</button>
+    <button class="nav-btn primary" onclick="goPhase(5)">Next →</button>
+  </div>
+</section>
+<section class="phase-section" id="phase-5" style="display:none">
+  <div class="phase-header">
+    <div class="ph-row">
+      <div class="ph-eyebrow">Phase 05</div>
+      <span class="ph-badge ph-badge-pending">To build</span>
+    </div>
+    <div class="ph-title">GitHub</div>
+    <div class="ph-desc">Org, repos, Actions deploy</div>
+    <div class="ph-status-note">GitHub org/repos — optional</div>
+  </div>
+  
+  <div class="steps-container">
+    <div class="checklist"><div class="check-item" data-id="p5-1" data-cat="codegen" data-phase="5"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">GitHub org bexo-sites (optional)</div><span class="ci-cat">codegen</span></div>
+<div class="check-item" data-id="p5-2" data-cat="codegen" data-phase="5"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">Org secrets for GitHub Actions deploy</div><span class="ci-cat">codegen</span></div>
+<div class="check-item" data-id="p5-3" data-cat="codegen" data-phase="5"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">portfolio-{handle} repo + deploy workflow</div><span class="ci-cat">codegen</span></div></div>
+  </div>
+  <div class="nav-buttons"><button class="nav-btn" onclick="goPhase(4)">← Previous</button>
+    <button class="nav-btn primary" onclick="goPhase(6)">Next →</button>
+  </div>
+</section>
+<section class="phase-section" id="phase-6" style="display:none">
+  <div class="phase-header">
+    <div class="ph-row">
+      <div class="ph-eyebrow">Phase 06</div>
+      <span class="ph-badge ph-badge-done">Complete</span>
+    </div>
+    <div class="ph-title">Hosting</div>
+    <div class="ph-desc">Public CDN / static serving</div>
+    <div class="ph-status-note">bexo-sites-public + Worker serves HTML</div>
+  </div>
+  
+  <div class="steps-container"><div class="terminal"><div class="t-bar"><span class="t-bar-title">Commands</span><button class="t-copy" onclick="copyBlock(this)">copy</button></div><pre class="t-body"># Public portfolio HTML bucket (no IAM conditions on allUsers)
+./infra/gcp/setup-public-sites-bucket.sh
+gcloud storage cp gs://bexo-portfolios/PROFILE_ID/site/index.html \
+  gs://bexo-sites-public/PROFILE_ID/site/index.html</pre></div>
+    <div class="checklist"><div class="check-item" data-id="p6-1" data-cat="dns" data-phase="6"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">Public bucket bexo-sites-public + setup script</div><span class="ci-cat">dns</span></div>
+<div class="check-item" data-id="p6-2" data-cat="dns" data-phase="6"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">GCS site/index.html written for test profile</div><span class="ci-cat">dns</span></div>
+<div class="check-item" data-id="p6-3" data-cat="dns" data-phase="6"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">Public URL https://{handle}.mybexo.com works</div><span class="ci-cat">dns</span></div></div>
+  </div>
+  <div class="nav-buttons"><button class="nav-btn" onclick="goPhase(5)">← Previous</button>
+    <button class="nav-btn primary" onclick="goPhase(7)">Next →</button>
+  </div>
+</section>
+<section class="phase-section" id="phase-7" style="display:none">
+  <div class="phase-header">
+    <div class="ph-row">
+      <div class="ph-eyebrow">Phase 07</div>
+      <span class="ph-badge ph-badge-done">Complete</span>
+    </div>
+    <div class="ph-title">DNS + build-done</div>
+    <div class="ph-desc">Workflow B + Cloudflare</div>
+    <div class="ph-status-note">Workflow B + KV + https://kavink.mybexo.com verified</div>
+  </div>
+  <div class="callout callout-next"><strong>Next:</strong> Complete — see docs/PHASE-7-PRODUCTION-CHECKLIST.md for security review.</div>
+  <div class="steps-container"><div class="terminal"><div class="t-bar"><span class="t-bar-title">Commands</span><button class="t-copy" onclick="copyBlock(this)">copy</button></div><pre class="t-body"># Worker + KV — see docs/PORTFOLIO-HOSTING-PLAN.md
+cd infra/cloudflare/worker && npx wrangler deploy
+# Dashboard: route *.mybexo.com/* + custom domain *.mybexo.com</pre></div>
+    <div class="checklist"><div class="check-item" data-id="p7-1" data-cat="dns" data-phase="7"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">Workflow B published — KV put + Supabase done</div><span class="ci-cat">dns</span></div>
+<div class="check-item" data-id="p7-2" data-cat="dns" data-phase="7"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">Wildcard DNS + route *.mybexo.com/* on Worker</div><span class="ci-cat">dns</span></div>
+<div class="check-item" data-id="p7-3" data-cat="dns" data-phase="7"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">wrangler deploy bexo-portfolio-proxy + KV binding</div><span class="ci-cat">dns</span></div></div>
+  </div>
+  <div class="nav-buttons"><button class="nav-btn" onclick="goPhase(6)">← Previous</button>
+    <button class="nav-btn primary" onclick="goPhase(8)">Next →</button>
+  </div>
+</section>
+<section class="phase-section" id="phase-8" style="display:none">
+  <div class="phase-header">
+    <div class="ph-row">
+      <div class="ph-eyebrow">Phase 08</div>
+      <span class="ph-badge ph-badge-active">In progress</span>
+    </div>
+    <div class="ph-title">Wire BEXO App</div>
+    <div class="ph-desc">api-server env + in-app E2E</div>
+    <div class="ph-status-note">Wire BEXO api-server — see docs/PHASE-8-SETUP.md</div>
+  </div>
+  <div class="callout callout-next"><strong>Next:</strong> Follow docs/PHASE-8-SETUP.md — N8N_WEBHOOK_URL + secret on BEXO api-server.</div>
+  <div class="steps-container"><div class="terminal"><div class="t-bar"><span class="t-bar-title">Commands</span><button class="t-copy" onclick="copyBlock(this)">copy</button></div><pre class="t-body"># BEXO api-server .env
+N8N_WEBHOOK_URL=https://n8n.mybexo.com/webhook/bexo-portfolio-generate
+N8N_WEBHOOK_SECRET=<same as ~/bexo-n8n/.env></pre></div>
+    <div class="checklist"><div class="check-item" data-id="p8-1" data-cat="gcp" data-phase="8"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">N8N_WEBHOOK_URL on BEXO api-server</div><span class="ci-cat">gcp</span></div>
+<div class="check-item" data-id="p8-2" data-cat="gcp" data-phase="8"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">N8N_WEBHOOK_SECRET matches n8n VM</div><span class="ci-cat">gcp</span></div>
+<div class="check-item" data-id="p8-3" data-cat="gcp" data-phase="8"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">App Generating screen triggers build</div><span class="ci-cat">gcp</span></div>
+<div class="check-item" data-id="p8-4" data-cat="gcp" data-phase="8"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">site_builds status done + portfolio_url</div><span class="ci-cat">gcp</span></div>
+<div class="check-item" data-id="p8-5" data-cat="gcp" data-phase="8"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">Live URL on mobile + desktop</div><span class="ci-cat">gcp</span></div></div>
+  </div>
+  <div class="nav-buttons"><button class="nav-btn" onclick="goPhase(7)">← Previous</button>
+    <button class="nav-btn primary" onclick="goPhase(9)">Next →</button>
+  </div>
+</section>
+<section class="phase-section" id="phase-9" style="display:none">
+  <div class="phase-header">
+    <div class="ph-row">
+      <div class="ph-eyebrow">Phase 09</div>
+      <span class="ph-badge ph-badge-pending">To build</span>
+    </div>
+    <div class="ph-title">Hardening</div>
+    <div class="ph-desc">Alerts, backups, limits</div>
+    <div class="ph-status-note">Alerts, backups, cost caps</div>
+  </div>
+  
+  <div class="steps-container">
+    <div class="checklist"><div class="check-item" data-id="p9-1" data-cat="gcp" data-phase="9"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">Cloud Tasks queue (optional)</div><span class="ci-cat">gcp</span></div>
+<div class="check-item" data-id="p9-2" data-cat="gcp" data-phase="9"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">Error alerting on failed builds</div><span class="ci-cat">gcp</span></div>
+<div class="check-item" data-id="p9-3" data-cat="gcp" data-phase="9"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">OpenRouter budget documented</div><span class="ci-cat">gcp</span></div>
+<div class="check-item" data-id="p9-4" data-cat="gcp" data-phase="9"><div class="cb" onclick="toggleCheck(this)"></div><div class="ci-text">n8n workflow export backed up weekly</div><span class="ci-cat">gcp</span></div></div>
+  </div>
+  <div class="nav-buttons"><button class="nav-btn" onclick="goPhase(8)">← Previous</button>
+    <button class="nav-btn primary" onclick="goPhase(10)">Finish</button>
+  </div>
+</section>
+</main>
+</div>
+<script>
+const STORAGE_KEY='bexoBuildProgress';
+const BASELINE_PROGRESS={"p3-8": true, "p4-6": true, "p3-6": true, "p2-1": true, "p1-8": true, "p4-1": true, "p1-3c": true, "p1-6": true, "p2-2": true, "p2-4": true, "p3-1": true, "p4-3": true, "p2-5": true, "p7-2": true, "p7-1": true, "p3-2": true, "p1-11": true, "p1-1": true, "p3-9": true, "p4-5": true, "p6-2": true, "p7-3": true, "p3-5": true, "p0-2": true, "p1-10": true, "p3-7": true, "p2-3": true, "p3-4": true, "p6-1": true, "p1-2": true, "p1-9": true, "p4-2": true, "p0-4": true, "p1-4": true, "p4-4": true, "p1-7": true, "p6-3": true};
+const PHASES=10;
+function loadProgress(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}')}catch(e){return {}}}
+function saveProgress(p){localStorage.setItem(STORAGE_KEY,JSON.stringify(p))}
+function mergeBaseline(p){Object.keys(BASELINE_PROGRESS).forEach(id=>{if(p[id]===undefined)p[id]=BASELINE_PROGRESS[id]});return p}
+function applyBaseline(){saveProgress({...BASELINE_PROGRESS});location.reload()}
+function updateProgressBar(){
+  const total=document.querySelectorAll('.check-item').length;
+  const done=document.querySelectorAll('.cb.checked').length;
+  const pct=total?Math.round(done/total*100):0;
+  document.getElementById('tp-fill').style.width=pct+'%';
+  document.getElementById('tp-text').textContent=pct+'% ('+done+'/'+total+')';
+}
+function toggleCheck(cb){
+  cb.classList.toggle('checked');
+  const txt=cb.nextElementSibling;
+  if(txt)txt.classList.toggle('checked');
+  const id=cb.closest('.check-item')?.dataset?.id;
+  const p=loadProgress();
+  if(id)p[id]=cb.classList.contains('checked');
+  saveProgress(p);
+  updateProgressBar();
+}
+function goPhase(n){
+  if(n<0||n>=PHASES)return;
+  document.querySelectorAll('.phase-section').forEach((el,i)=>el.style.display=i===n?'block':'none');
+  document.querySelectorAll('.sb-item').forEach((el,i)=>el.classList.toggle('active',i===n));
+  document.getElementById('main').scrollTo(0,0);
+}
+function copyBlock(btn){
+  const pre=btn.closest('.terminal').querySelector('.t-body');
+  navigator.clipboard.writeText(pre.textContent).then(()=>{btn.textContent='copied';setTimeout(()=>btn.textContent='copy',1500)});
+}
+function setFilter(cat){
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.toggle('active',b.dataset.filter===cat));
+  document.querySelectorAll('.check-item').forEach(el=>{
+    el.style.display=(cat==='all'||el.dataset.cat===cat)?'flex':'none';
+  });
+}
+function exportProgress(){
+  const blob=new Blob([JSON.stringify(loadProgress(),null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='bexo-build-progress.json';
+  a.click();
+}
+document.addEventListener('DOMContentLoaded',()=>{
+  const p=mergeBaseline(loadProgress());
+  saveProgress(p);
+  document.querySelectorAll('.check-item').forEach(el=>{
+    if(p[el.dataset.id]){
+      el.querySelector('.cb').classList.add('checked');
+      el.querySelector('.ci-text')?.classList.add('checked');
+    }
+  });
+  updateProgressBar();
+  goPhase(7);
+});
+</script>
+</body>
+</html>

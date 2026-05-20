@@ -1,0 +1,143 @@
+{
+  "name": "BEXO — Build Done (Workflow B)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "bexo-build-done",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "webhook-done",
+      "name": "Webhook build-done",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "bexo-build-done"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.headers['x-bexo-internal-secret'] || $json.headers['X-BEXO-Internal-Secret'] || '' }}",
+              "operation": "equals",
+              "value2": "={{ $env.BEXO_INTERNAL_SECRET }}"
+            }
+          ]
+        }
+      },
+      "id": "verify-callback-secret",
+      "name": "Verify callback secret",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.body.status }}",
+              "operation": "equals",
+              "value2": "success"
+            }
+          ]
+        }
+      },
+      "id": "if-success",
+      "name": "If success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 220]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ 'https://api.cloudflare.com/client/v4/accounts/' + $env.CLOUDFLARE_ACCOUNT_ID + '/storage/kv/namespaces/' + $env.CLOUDFLARE_KV_NAMESPACE_ID + '/values/' + encodeURIComponent($('Webhook build-done').first().json.body.handle) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.CLOUDFLARE_TOKEN }}" },
+            { "name": "Content-Type", "value": "text/plain" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "text/plain",
+        "body": "={{ $('Webhook build-done').first().json.body.profileId }}",
+        "options": {}
+      },
+      "id": "cf-kv-put",
+      "name": "Cloudflare — KV put handle",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 220],
+      "notes": "Maps handle → profileId for Worker. See docs/PORTFOLIO-HOSTING-PLAN.md"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL + '/rest/v1/site_builds?id=eq.' + $('Webhook build-done').first().json.body.buildId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_ROLE_KEY }}" },
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_ROLE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=minimal" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ (() => { const b = $('Webhook build-done').first().json.body; return { status: 'done', portfolio_url: b.siteUrl, build_log: b.buildLog || 'Build complete' }; })() }}"
+      },
+      "id": "supabase-done",
+      "name": "Supabase — done",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 220]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL + '/rest/v1/site_builds?id=eq.' + $('Webhook build-done').first().json.body.buildId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_ROLE_KEY }}" },
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_ROLE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=minimal" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ (() => { const b = $('Webhook build-done').first().json.body; return { status: 'failed', build_log: (b.error || 'Codegen failed') + (b.buildLog ? '\\n' + b.buildLog : '') }; })() }}"
+      },
+      "id": "supabase-fail",
+      "name": "Supabase — failed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 420]
+    }
+  ],
+  "connections": {
+    "Webhook build-done": {
+      "main": [[{ "node": "Verify callback secret", "type": "main", "index": 0 }]]
+    },
+    "Verify callback secret": {
+      "main": [[{ "node": "If success", "type": "main", "index": 0 }], []]
+    },
+    "If success": {
+      "main": [
+        [{ "node": "Cloudflare — KV put handle", "type": "main", "index": 0 }],
+        [{ "node": "Supabase — failed", "type": "main", "index": 0 }]
+      ]
+    },
+    "Cloudflare — KV put handle": {
+      "main": [[{ "node": "Supabase — done", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" }
+}
