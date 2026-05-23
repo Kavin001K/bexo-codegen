@@ -42,3 +42,19 @@ def inject_mobile_safety(html: str) -> str:
     if head_end != -1:
         return html[:head_end] + block + html[head_end:]
     return block + html
+
+
+def inject_mobile_safety_to_site_dir(site_dir: str) -> int:
+    """Inject touch-target CSS into every HTML file in a Next static export."""
+    from pathlib import Path
+
+    count = 0
+    for path in Path(site_dir).rglob("*.html"):
+        text = path.read_text(encoding="utf-8")
+        patched = inject_mobile_safety(text)
+        if patched != text:
+            path.write_text(patched, encoding="utf-8")
+            count += 1
+    if count:
+        print(f"[MOBILE] Injected safety CSS into {count} HTML file(s)")
+    return count

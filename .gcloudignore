@@ -1,0 +1,23 @@
+# Shrink Cloud Build context (was ~330MB with node_modules)
+.git
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.mypy_cache
+.env
+.env.*
+!.env.example
+
+# Next.js build artifacts (rebuilt in Docker or at runtime)
+templates/portfolio-next/node_modules
+templates/portfolio-next/.next
+templates/portfolio-next/out
+workspace
+
+# Docs/samples not needed in image
+docs/
+samples/
+
+# Local dev only
+.venv
+venv

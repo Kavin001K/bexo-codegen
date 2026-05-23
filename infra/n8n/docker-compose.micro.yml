@@ -54,6 +54,7 @@ services:
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
       - OPENROUTER_MODEL_SPEC=${OPENROUTER_MODEL_SPEC:-openrouter/free}
+      # Base URL only (no /build) — workflow appends /build automatically
       - CLOUD_RUN_BUILD_URL=${CLOUD_RUN_BUILD_URL:-https://bexo-codegen-901109516440.us-central1.run.app}
       # Cloudflare + other secrets: env_file only (.env). Do NOT list CLOUDFLARE_* here —
       # environment: overrides env_file and ${VAR:-} can wipe values (e.g. tokens with #).

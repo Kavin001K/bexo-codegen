@@ -53,6 +53,44 @@
     },
     {
       "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://storage.googleapis.com/bexo-sites-public/' + $('Webhook build-done').first().json.body.profileId + '/site/index.html' }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "verify-gcs",
+      "name": "Verify GCS index.html",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [790, 220],
+      "notes": "Do not publish handle to KV until static site exists in GCS."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.statusCode }}",
+              "operation": "equal",
+              "value2": 200
+            }
+          ]
+        }
+      },
+      "id": "if-gcs-ok",
+      "name": "If GCS 200",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [900, 220]
+    },
+    {
+      "parameters": {
         "method": "PUT",
         "url": "={{ 'https://api.cloudflare.com/client/v4/accounts/' + $env.CLOUDFLARE_ACCOUNT_ID + '/storage/kv/namespaces/' + $env.CLOUDFLARE_KV_NAMESPACE_ID + '/values/' + encodeURIComponent($('Webhook build-done').first().json.body.handle) }}",
         "sendHeaders": true,
@@ -72,7 +110,7 @@
       "name": "Cloudflare — KV put handle",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [900, 220],
+      "position": [1010, 220],
       "notes": "Maps handle → profileId for Worker. See docs/PORTFOLIO-HOSTING-PLAN.md"
     },
     {
@@ -96,7 +134,30 @@
       "name": "Supabase — done",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1120, 220]
+      "position": [1220, 220]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL + '/rest/v1/site_builds?id=eq.' + $('Webhook build-done').first().json.body.buildId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_ROLE_KEY }}" },
+            { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_ROLE_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=minimal" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ (() => { const b = $('Webhook build-done').first().json.body; const code = $('Verify GCS index.html').first().json.statusCode; return { status: 'failed', build_log: 'Build reported success but GCS site missing (HTTP ' + code + '). Re-run portfolio generate.' }; })() }}"
+      },
+      "id": "supabase-fail-gcs",
+      "name": "Supabase — failed (no GCS)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1010, 380]
     },
     {
       "parameters": {
@@ -119,7 +180,7 @@
       "name": "Supabase — failed",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [900, 420]
+      "position": [900, 480]
     }
   ],
   "connections": {
@@ -131,8 +192,17 @@
     },
     "If success": {
       "main": [
-        [{ "node": "Cloudflare — KV put handle", "type": "main", "index": 0 }],
+        [{ "node": "Verify GCS index.html", "type": "main", "index": 0 }],
         [{ "node": "Supabase — failed", "type": "main", "index": 0 }]
+      ]
+    },
+    "Verify GCS index.html": {
+      "main": [[{ "node": "If GCS 200", "type": "main", "index": 0 }]]
+    },
+    "If GCS 200": {
+      "main": [
+        [{ "node": "Cloudflare — KV put handle", "type": "main", "index": 0 }],
+        [{ "node": "Supabase — failed (no GCS)", "type": "main", "index": 0 }]
       ]
     },
     "Cloudflare — KV put handle": {

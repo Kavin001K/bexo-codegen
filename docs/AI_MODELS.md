@@ -1,48 +1,52 @@
-# BEXO AI model routing (DeepSeek + Kimi)
+# BEXO AI model routing (Claude Code + DeepSeek + Kimi)
 
-## Per-task assignment
+## Architecture (v2)
 
-| Pipeline step | Where | Provider | Default model | Env override |
-|---------------|-------|----------|---------------|--------------|
-| Personality JSON | n8n | **OpenRouter (free)** | `openrouter/free` | `OPENROUTER_MODEL_SPEC` |
-| `portfolio.md` spec | n8n | **OpenRouter (free)** | `openrouter/free` | `OPENROUTER_MODEL_SPEC` |
-| HTML generation (attempt 1) | Cloud Run | **Kimi** | `kimi-k2-turbo-preview` | `KIMI_MODEL_GENERATE` |
-| HTML fix (attempts 2–3) | Cloud Run | **DeepSeek** | `deepseek-chat` | `DEEPSEEK_MODEL_FIX` |
-| Content moderation | Cloud Run | **DeepSeek** | `deepseek-chat` | `DEEPSEEK_MODEL_MODERATION` |
+| Step | Where | Engine |
+|------|-------|--------|
+| User facts | Supabase | Database only — **no AI portfolio.md** |
+| `portfolio.md` | Cloud Run | `spec_builder.py` (deterministic) |
+| Site shell | Cloud Run | Claude Code CLI + Next.js static export |
+| Content updates | api-server | `POST /portfolio/sync-data` → GCS `data.json` (no AI) |
+| Legacy HTML | Cloud Run | `CODEGEN_ENGINE=python` rollback |
 
-If Kimi fails on generation, codegen falls back to DeepSeek, then OpenRouter (if configured).
+## Claude Code proxy (DeepSeek / Kimi)
+
+Set on Cloud Run (map from GCP secrets):
+
+| Env | Purpose |
+|-----|---------|
+| `ANTHROPIC_BASE_URL` | DeepSeek Anthropic-compatible endpoint or OpenRouter bridge |
+| `ANTHROPIC_AUTH_TOKEN` | `DEEPSEEK_API_KEY` or `OPENROUTER_API_KEY` |
+| `ANTHROPIC_MODEL` | Primary codegen model |
+| `ANTHROPIC_DEFAULT_SONNET_MODEL` | Same as primary |
+| `CLAUDE_CODE_SUBAGENT_MODEL` | Kimi / fast model for QA fix pass |
+| `CODEGEN_ENGINE` | `claude` (default) or `python` |
+| `SKIP_CLAUDE` | `true` to template-only build (no CLI) |
+
+DeepSeek **context caching** reduces cost on repeated file-tree turns when using a compatible `ANTHROPIC_BASE_URL`.
 
 ## API keys (GCP Secret Manager)
 
 | Secret | Used for |
 |--------|----------|
-| `deepseek-api-key` | DeepSeek direct API |
-| `kimi-api-key` | Moonshot / Kimi direct API |
-| `openrouter-api-key` | Optional unified gateway + fallback |
+| `deepseek-api-key` | Claude proxy + moderation |
+| `kimi-api-key` | Fix pass / fallback |
+| `openrouter-api-key` | Optional gateway fallback |
 
-Get keys:
+## n8n Workflow A (v2)
 
-- DeepSeek: https://platform.deepseek.com/api_keys
-- Kimi (Moonshot): https://platform.moonshot.ai/console/api-keys
+No OpenRouter nodes. Flow: webhook → Supabase `building` → Cloud Run `/build`.
 
-## OpenRouter-only mode
+Set on n8n VM: `CLOUD_RUN_BUILD_URL`, `BEXO_INTERNAL_SECRET`, 300s HTTP timeout on Cloud Run node.
 
-Set only `OPENROUTER_API_KEY` (no DeepSeek/Kimi keys). Defaults:
+## Content sync (api-server)
 
-- Spec/fix: `deepseek/deepseek-chat`
-- Generate: `moonshotai/kimi-k2`
+`POST /api/portfolio/sync-data` requires:
 
-Override with `OPENROUTER_MODEL_*` env vars.
+- `GCS_PUBLIC_BUCKET` (default `bexo-sites-public`)
+- `GCS_SA_KEY_JSON` or `GOOGLE_APPLICATION_CREDENTIALS`
 
-## n8n workflow models (OpenRouter, free only)
+## Rollback
 
-Workflow A uses **OpenRouter** for both AI nodes. Set on the VM in `~/bexo-n8n/.env`:
-
-- `OPENROUTER_MODEL_SPEC=openrouter/free` (default — OpenRouter’s free model router)
-
-Other free options (if you want a fixed model instead of the router):
-
-- `meta-llama/llama-3.3-8b-instruct:free`
-- `google/gemma-2-9b-it:free`
-
-Do **not** use `deepseek/deepseek-chat` on OpenRouter unless you have credits — it is not in the free tier.
+Deploy with `CODEGEN_ENGINE=python` to use the legacy Kimi/DeepSeek HTML loop.

@@ -7,14 +7,26 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
 SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 
 
-def _headers() -> dict[str, str]:
+def _headers(*, prefer: str = "return=minimal") -> dict[str, str]:
     if not SERVICE_KEY:
         raise ValueError("SUPABASE_SERVICE_ROLE_KEY is required for site_builds updates")
-    return {
+    h = {
         "apikey": SERVICE_KEY,
         "Authorization": f"Bearer {SERVICE_KEY}",
         "Content-Type": "application/json",
-        "Prefer": "return=minimal",
+    }
+    if prefer:
+        h["Prefer"] = prefer
+    return h
+
+
+def read_headers() -> dict[str, str]:
+    """Headers for Supabase REST reads (full row representation)."""
+    if not SERVICE_KEY:
+        raise ValueError("SUPABASE_SERVICE_ROLE_KEY is required")
+    return {
+        "apikey": SERVICE_KEY,
+        "Authorization": f"Bearer {SERVICE_KEY}",
     }
 
 

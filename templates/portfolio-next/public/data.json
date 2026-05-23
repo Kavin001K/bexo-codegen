@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "syncedAt": "2026-01-01T00:00:00.000Z",
+  "handle": "demo",
+  "profile": {
+    "full_name": "Demo User",
+    "headline": "Full Stack Developer",
+    "bio": "Building great products.",
+    "avatar_url": null,
+    "location": "Earth"
+  },
+  "projects": [],
+  "skills": [],
+  "experiences": [],
+  "education": [],
+  "theme": {}
+}

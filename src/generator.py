@@ -32,9 +32,15 @@ Critical: body { overflow-x: hidden }, all images max-width 100%, every a/button
 
 
 def read_portfolio_spec(profile_id: str) -> str:
-    bucket = gcs.bucket(BUCKET)
-    blob = bucket.blob(f"{profile_id}/portfolio.md")
-    return blob.download_as_text()
+    """Build portfolio.md from Supabase (source of truth)."""
+    from spec_builder import build_spec_for_profile, upload_spec_to_gcs
+
+    md = build_spec_for_profile(profile_id)
+    try:
+        upload_spec_to_gcs(profile_id, md)
+    except Exception as e:
+        print(f"[SPEC] GCS audit upload skipped: {e}")
+    return md
 
 
 def _strip_fences(text: str) -> str:
@@ -97,3 +103,49 @@ def save_to_gcs(profile_id: str, html: str) -> None:
         blob.cache_control = cache
         blob.patch()
         print(f"[GCS] Saved site for {profile_id} → gs://{bucket_name}/{path}")
+
+
+def save_data_json_to_gcs(profile_id: str, snapshot: dict) -> None:
+    import json
+
+    body = json.dumps(snapshot, indent=2)
+    path = f"{profile_id}/site/data.json"
+    cache = "public, max-age=60"
+    for bucket_name in (BUCKET, PUBLIC_BUCKET):
+        blob = gcs.bucket(bucket_name).blob(path)
+        blob.upload_from_string(body, content_type="application/json")
+        blob.cache_control = cache
+        blob.patch()
+        print(f"[GCS] data.json → gs://{bucket_name}/{path}")
+
+
+def site_index_exists_in_gcs(profile_id: str, bucket_name: str | None = None) -> bool:
+    """True when public site index.html exists (Worker serves this path)."""
+    bucket = (bucket_name or PUBLIC_BUCKET).strip()
+    path = f"{profile_id}/site/index.html"
+    return gcs.bucket(bucket).blob(path).exists()
+
+
+def save_site_dir_to_gcs(profile_id: str, site_dir: str) -> None:
+    """Upload Next.js static export directory to GCS."""
+    import mimetypes
+    from pathlib import Path
+
+    root = Path(site_dir)
+    if not root.is_dir():
+        raise FileNotFoundError(f"Site dir not found: {site_dir}")
+
+    cache = "public, max-age=300"
+    for bucket_name in (BUCKET, PUBLIC_BUCKET):
+        bucket = gcs.bucket(bucket_name)
+        for file_path in root.rglob("*"):
+            if not file_path.is_file():
+                continue
+            rel = file_path.relative_to(root).as_posix()
+            gcs_path = f"{profile_id}/site/{rel}"
+            content_type = mimetypes.guess_type(str(file_path))[0] or "application/octet-stream"
+            blob = bucket.blob(gcs_path)
+            blob.upload_from_filename(str(file_path), content_type=content_type)
+            blob.cache_control = cache
+            blob.patch()
+        print(f"[GCS] Site dir uploaded for {profile_id} → gs://{bucket_name}/{profile_id}/site/")

@@ -4,17 +4,15 @@ import traceback
 import requests
 from flask import Flask, jsonify, request
 
-from generator import fix_website, generate_website, read_portfolio_spec, save_to_gcs
-from mobile_safety import inject_mobile_safety
-from github_push import push_to_github
-from moderation import moderate_text
+from build_engine import run_build
+from generator import site_index_exists_in_gcs
+from skill_orchestrator import skills_for_health
 from supabase_client import update_build
-from tester import run_tests
 
 app = Flask(__name__)
 
-MAX_ATTEMPTS = int(os.environ.get("MAX_BUILD_ATTEMPTS", "3"))
 N8N_CALLBACK = os.environ.get("N8N_CALLBACK_URL", "")
+CODEGEN_ENGINE = os.environ.get("CODEGEN_ENGINE", "claude")
 INTERNAL_SECRET = os.environ.get("BEXO_INTERNAL_SECRET", "")
 PORTFOLIO_DOMAIN = os.environ.get("PORTFOLIO_DOMAIN", "mybexo.com")
 
@@ -41,26 +39,35 @@ def _notify_n8n(payload: dict) -> None:
         print(f"[CALLBACK] n8n notify failed: {e}")
 
 
-@app.route("/")
+def _health_payload() -> dict:
+    return {
+        "service": "bexo-codegen",
+        "status": "ok",
+        "engine": CODEGEN_ENGINE,
+        "llm": {
+            "primary": os.environ.get("DEEPSEEK_MODEL", "deepseek-v4-pro[1m]"),
+            "fix": os.environ.get("KIMI_MODEL", "moonshotai/kimi-k2"),
+        },
+        "skills": skills_for_health(),
+        "endpoints": {
+            "health": "GET /health",
+            "build": "POST /build (requires X-BEXO-Internal-Secret)",
+        },
+    }
+
+
+@app.route("/", methods=["GET"])
 def index():
-    return jsonify(
-        {
-            "service": "bexo-codegen",
-            "status": "ok",
-            "endpoints": {
-                "health": "GET /health",
-                "build": "POST /build (requires X-BEXO-Internal-Secret)",
-            },
-        }
-    )
+    return jsonify(_health_payload())
 
 
 @app.route("/health")
 def health():
-    return {"status": "ok", "service": "bexo-codegen"}
+    return jsonify(_health_payload())
 
 
 @app.route("/build", methods=["POST"])
+@app.route("/", methods=["POST"])
 def build():
     if not _verify_internal_secret():
         return jsonify({"error": "unauthorized"}), 401
@@ -83,51 +90,13 @@ def build():
         if build_id:
             update_build(build_id, status="building", build_log="Codegen started")
 
-        print(f"[BUILD] Starting profile={profile_id} handle={handle}")
-        spec = read_portfolio_spec(profile_id)
-        log_lines.append(f"Spec loaded ({len(spec)} chars)")
+        print(f"[BUILD] Starting profile={profile_id} handle={handle} engine={CODEGEN_ENGINE}")
+        log_lines.extend(run_build(profile_id, handle))
 
-        mod_issues = moderate_text(spec, "portfolio spec")
-        if mod_issues:
-            raise ValueError("; ".join(mod_issues))
-
-        html = None
-        issues: list = []
-        for attempt in range(1, MAX_ATTEMPTS + 1):
-            result = generate_website(spec, attempt, issues if attempt > 1 else None)
-            html = inject_mobile_safety(result["html"])
-            log_lines.append(f"Generated attempt {attempt}")
-
-            mod_html = moderate_text(html, "generated html")
-            if mod_html:
-                issues = mod_html
-            else:
-                run_lh = attempt == MAX_ATTEMPTS
-                issues = run_tests(html, profile_id, lighthouse=run_lh)
-
-            if not issues:
-                log_lines.append("All tests passed")
-                break
-            log_lines.append(f"Attempt {attempt} issues: {issues[:5]}")
-            if attempt < MAX_ATTEMPTS:
-                html = inject_mobile_safety(fix_website(html, issues, spec))
-
-        if issues:
-            raise RuntimeError(f"Build failed after {MAX_ATTEMPTS} attempts: {issues[:5]}")
-
-        save_to_gcs(profile_id, html)
-        log_lines.append(f"GCS site: gs://{os.environ.get('GCS_BUCKET', 'bexo-portfolios')}/{profile_id}/site/index.html")
-
-        repo_url = ""
-        if os.environ.get("SKIP_GITHUB_PUSH", "").lower() in ("1", "true", "yes"):
-            log_lines.append("GitHub push skipped (SKIP_GITHUB_PUSH)")
-        else:
-            try:
-                repo_url = push_to_github(handle, html, spec, profile_id)
-                log_lines.append(f"GitHub: {repo_url}")
-            except Exception as gh_err:
-                log_lines.append(f"GitHub skipped (non-fatal): {gh_err}")
-                print(f"[GITHUB] non-fatal: {gh_err}")
+        if not site_index_exists_in_gcs(profile_id):
+            raise RuntimeError(
+                f"Build finished but gs://bexo-sites-public/{profile_id}/site/index.html is missing"
+            )
 
         build_log = "\n".join(log_lines)
         if build_id:

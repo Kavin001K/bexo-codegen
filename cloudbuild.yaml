@@ -4,6 +4,10 @@ steps:
       - build
       - -t
       - us-central1-docker.pkg.dev/$PROJECT_ID/bexo/codegen:$BUILD_ID
+      - -t
+      - us-central1-docker.pkg.dev/$PROJECT_ID/bexo/codegen:latest
+      - -f
+      - Dockerfile
       - .
   - name: gcr.io/cloud-builders/docker
     args:
@@ -17,13 +21,13 @@ steps:
       - --image=us-central1-docker.pkg.dev/$PROJECT_ID/bexo/codegen:$BUILD_ID
       - --platform=managed
       - --region=us-central1
-      - --memory=2Gi
+      - --memory=4Gi
       - --cpu=2
-      - --timeout=300
+      - --timeout=600
       - --max-instances=5
       - --allow-unauthenticated
       - --service-account=bexo-codegen@$PROJECT_ID.iam.gserviceaccount.com
-      - --set-env-vars=GCS_BUCKET=bexo-portfolios,GCS_PUBLIC_BUCKET=bexo-sites-public,GITHUB_ORG=bexo-sites,PORTFOLIO_DOMAIN=mybexo.com,RUN_LIGHTHOUSE=false,OPENROUTER_FREE_ONLY=true,OPENROUTER_MODEL_GENERATE=openrouter/free,OPENROUTER_MODEL_FIX=openrouter/free,OPENROUTER_MODEL_MODERATION=openrouter/free,MAX_OUTPUT_TOKENS=4096,OPENROUTER_FREE_MAX_TOKENS=4096,TEST_MAX_SMALL_TOUCH_TARGETS=2
+      - '--set-env-vars=GCS_BUCKET=bexo-portfolios,GCS_PUBLIC_BUCKET=bexo-sites-public,GITHUB_ORG=bexo-sites,PORTFOLIO_DOMAIN=mybexo.com,RUN_LIGHTHOUSE=false,CODEGEN_ENGINE=claude,SKIP_CLAUDE=false,REQUIRE_CLAUDE=true,MAX_OUTPUT_TOKENS=4096,TEST_MAX_SMALL_TOUCH_TARGETS=12,TEST_MAX_OVERFLOW_PX=12,DEEPSEEK_ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic,DEEPSEEK_MODEL=deepseek-v4-pro[1m],DEEPSEEK_MODEL_FAST=deepseek-v4-flash,KIMI_ANTHROPIC_BASE_URL=https://openrouter.ai/api,KIMI_MODEL=moonshotai/kimi-k2,OPENROUTER_ANTHROPIC_BASE_URL=https://openrouter.ai/api,CLAUDE_CODE_SUBAGENT_MODEL=deepseek-v4-flash,CLAUDE_CODE_EFFORT_LEVEL=max,CLAUDE_CODE_MAX_TURNS=24'
       - --set-secrets=DEEPSEEK_API_KEY=deepseek-api-key:latest,KIMI_API_KEY=kimi-api-key:latest,OPENROUTER_API_KEY=openrouter-api-key:latest,GITHUB_TOKEN=github-token:latest,N8N_CALLBACK_URL=n8n-callback-url:latest,BEXO_INTERNAL_SECRET=bexo-internal-secret:latest,SUPABASE_SERVICE_ROLE_KEY=supabase-service-key:latest,SUPABASE_URL=supabase-url:latest
 
 options:

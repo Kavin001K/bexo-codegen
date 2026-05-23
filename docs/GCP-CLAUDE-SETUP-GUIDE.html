@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BEXO — GCP + Claude Code Setup Guide</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --surface: #1a2332;
+      --border: #2d3a4f;
+      --text: #e8eef4;
+      --muted: #8b9cb3;
+      --cyan: #00d4ff;
+      --cyan-dim: #00d4ff33;
+      --green: #6afad0;
+      --amber: #f5c542;
+      --red: #fa6a6a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      font-size: 15px;
+    }
+    .wrap { max-width: 920px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin: 0 0 0.5rem;
+      background: linear-gradient(135deg, var(--cyan), #7c6afa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .subtitle { color: var(--muted); margin: 0 0 2rem; font-size: 0.95rem; }
+    h2 {
+      font-size: 1.15rem;
+      margin: 2.5rem 0 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--cyan);
+    }
+    h3 { font-size: 1rem; margin: 1.5rem 0 0.75rem; color: var(--text); }
+    p { margin: 0.75rem 0; }
+    a { color: var(--cyan); }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      margin: 1rem 0;
+    }
+    .card.highlight { border-color: var(--cyan); box-shadow: 0 0 0 1px var(--cyan-dim); }
+    pre, code {
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 0.82rem;
+    }
+    pre {
+      background: #0a0e14;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      overflow-x: auto;
+      margin: 0.75rem 0;
+    }
+    code { color: var(--cyan); background: #0a0e14; padding: 0.15em 0.4em; border-radius: 4px; }
+    pre code { color: var(--text); background: none; padding: 0; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+      margin: 1rem 0;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 0.6rem 0.75rem;
+      text-align: left;
+    }
+    th { background: #121a24; color: var(--cyan); font-weight: 600; }
+    .flow {
+      background: #0a0e14;
+      border-radius: 8px;
+      padding: 1rem;
+      font-family: monospace;
+      font-size: 0.8rem;
+      line-height: 1.5;
+      white-space: pre;
+      color: var(--muted);
+    }
+    .todo-section { margin: 1.5rem 0; }
+    .todo-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      padding: 0.65rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .todo-item:last-child { border-bottom: none; }
+    .todo-item input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      margin-top: 3px;
+      accent-color: var(--cyan);
+      flex-shrink: 0;
+    }
+    .todo-item.done label { color: var(--muted); text-decoration: line-through; }
+    .todo-item label { flex: 1; cursor: pointer; }
+    .todo-item .phase {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--cyan);
+      font-weight: 700;
+      display: block;
+      margin-bottom: 0.2rem;
+    }
+    .badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      padding: 0.2em 0.5em;
+      border-radius: 4px;
+      font-weight: 600;
+      margin-left: 0.35rem;
+    }
+    .badge.gcp { background: #1a3a52; color: var(--cyan); }
+    .badge.cf { background: #2a2410; color: var(--amber); }
+    .badge.n8n { background: #2a1a3a; color: #c9a0ff; }
+    .badge.app { background: #1a2a1a; color: var(--green); }
+    .progress-bar {
+      height: 6px;
+      background: var(--border);
+      border-radius: 999px;
+      margin: 1rem 0 2rem;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--cyan), var(--green));
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+    .progress-text { font-size: 0.85rem; color: var(--muted); }
+    .warn { color: var(--amber); }
+    .ok { color: var(--green); }
+    ul { margin: 0.5rem 0; padding-left: 1.25rem; }
+    li { margin: 0.35rem 0; }
+    .toolbar {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-bottom: 1.5rem;
+    }
+    .toolbar button {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+    .toolbar button:hover { border-color: var(--cyan); color: var(--cyan); }
+    nav.toc {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 2rem;
+    }
+    nav.toc ol { margin: 0; padding-left: 1.25rem; }
+    nav.toc li { margin: 0.35rem 0; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>BEXO GCP + Claude Code Setup</h1>
+    <p class="subtitle">
+      Step-by-step guide to deploy portfolio website generation on Google Cloud.
+      Based on the implemented <strong>bexo-codegen v2</strong> system (Supabase → Cloud Run → GCS → Cloudflare).
+    </p>
+
+    <div class="toolbar">
+      <button type="button" id="btn-reset">Reset checklist</button>
+      <button type="button" id="btn-export">Copy progress JSON</button>
+    </div>
+    <div class="progress-text"><span id="progress-label">0 / 0</span> steps complete</div>
+    <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+
+    <nav class="toc card">
+      <strong>Contents</strong>
+      <ol>
+        <li><a href="#built">What is already built in code</a></li>
+        <li><a href="#arch">How it works (one picture)</a></li>
+        <li><a href="#prereq">Prerequisites</a></li>
+        <li><a href="#phase-a">Phase A — GCP project &amp; APIs</a></li>
+        <li><a href="#phase-b">Phase B — GCS buckets</a></li>
+        <li><a href="#phase-c">Phase C — Secret Manager (DeepSeek / Claude proxy)</a></li>
+        <li><a href="#phase-d">Phase D — Deploy Cloud Run (Claude Code engine)</a></li>
+        <li><a href="#phase-e">Phase E — n8n Workflow A (trigger builds)</a></li>
+        <li><a href="#phase-f">Phase F — Cloudflare (live URLs)</a></li>
+        <li><a href="#phase-g">Phase G — api-server sync (edits without rebuild)</a></li>
+        <li><a href="#phase-h">Phase H — Test end-to-end</a></li>
+        <li><a href="#costs">Costs (affordable stack)</a></li>
+        <li><a href="#trouble">Troubleshooting</a></li>
+        <li><a href="#checklist">Master checklist</a></li>
+      </ol>
+    </nav>
+
+    <!-- ========== WHAT'S BUILT ========== -->
+    <h2 id="built">1. What is already built in your repo</h2>
+    <div class="card">
+      <p>You do <strong>not</strong> need to write the Python/HTML generator from scratch. The codebase already includes:</p>
+      <table>
+        <tr><th>Component</th><th>Location</th><th>Role</th></tr>
+        <tr><td>DB → portfolio.md</td><td><code>src/spec_builder.py</code></td><td>Reads Supabase; no AI inventing user facts</td></tr>
+        <tr><td>Claude Code build</td><td><code>src/build_engine.py</code></td><td>Next.js template + optional Claude CLI + npm build</td></tr>
+        <tr><td>Flask API</td><td><code>src/main.py</code></td><td><code>POST /build</code> for n8n (300s timeout)</td></tr>
+        <tr><td>Next template</td><td><code>templates/portfolio-next/</code></td><td>Static export; loads <code>data.json</code></td></tr>
+        <tr><td>QA</td><td><code>src/tester.py</code></td><td>Playwright 375px checks on <code>out/</code></td></tr>
+        <tr><td>n8n workflow v2</td><td><code>infra/n8n/workflows/bexo-portfolio-generate.json</code></td><td>No OpenRouter AI nodes</td></tr>
+        <tr><td>Edge proxy</td><td><code>infra/cloudflare/worker/portfolio-proxy.js</code></td><td>Serves HTML, <code>_next/</code>, <code>data.json</code></td></tr>
+        <tr><td>App 90% gate</td><td>BEXO app + api-server</td><td>Build only when profile ≥90% complete</td></tr>
+        <tr><td>Live sync</td><td><code>POST /api/portfolio/sync-data</code></td><td>Updates site when user edits profile (no Claude)</td></tr>
+      </table>
+      <p class="warn"><strong>Your job in GCP:</strong> deploy this container, wire secrets, connect n8n + Cloudflare. The code is ready; infrastructure is what you configure below.</p>
+    </div>
+
+    <!-- ========== ARCHITECTURE ========== -->
+    <h2 id="arch">2. How it works</h2>
+    <div class="flow">BEXO App (profile ≥90%)
+    → api-server POST /portfolio/trigger-build
+    → n8n webhook (Workflow A)
+    → Cloud Run POST /build  [Claude Code + DeepSeek/Kimi proxy]
+         1. spec_builder.py pulls Supabase
+         2. Next.js build → out/
+         3. Upload to gs://bexo-sites-public/{profileId}/site/
+    → n8n callback (Workflow B) → Cloudflare KV + Supabase site_builds = done
+    → https://handle.mybexo.com (Worker → GCS)
+
+User edits project in app
+    → POST /api/portfolio/sync-data
+    → Overwrites gs://.../site/data.json only  (cheap, no Cloud Run)</div>
+
+    <h3>Claude vs DeepSeek (important)</h3>
+    <p>The container runs the <strong>Claude Code CLI</strong>, but API calls are routed through <code>ANTHROPIC_BASE_URL</code> to <strong>DeepSeek</strong> (or OpenRouter). You need a DeepSeek API key, not necessarily an Anthropic subscription.</p>
+
+    <!-- ========== PREREQ ========== -->
+    <h2 id="prereq">3. Prerequisites</h2>
+    <ul>
+      <li>Google Cloud project (e.g. <code>bexo-prod</code>) with billing enabled</li>
+      <li><code>gcloud</code> CLI installed and logged in: <code>gcloud auth login</code></li>
+      <li>DeepSeek API key — <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noopener">platform.deepseek.com</a></li>
+      <li>Optional: Kimi (Moonshot) key for fix pass — <a href="https://platform.moonshot.ai" target="_blank" rel="noopener">platform.moonshot.ai</a></li>
+      <li>Supabase project URL + service role key (already used by BEXO)</li>
+      <li>n8n running (e.g. <code>n8n.mybexo.com</code>)</li>
+      <li>Cloudflare zone for <code>mybexo.com</code></li>
+      <li>GitHub PAT for optional <code>portfolio-{handle}</code> repos</li>
+    </ul>
+
+    <!-- ========== PHASE A ========== -->
+    <h2 id="phase-a">Phase A — GCP project &amp; APIs</h2>
+    <div class="card">
+      <pre><code>export PROJECT_ID=bexo-prod
+gcloud config set project $PROJECT_ID
+
+gcloud services enable \
+  run.googleapis.com \
+  cloudbuild.googleapis.com \
+  artifactregistry.googleapis.com \
+  secretmanager.googleapis.com \
+  storage.googleapis.com</code></pre>
+      <p>Run foundation script (creates service account, Artifact Registry):</p>
+      <pre><code>cd bexo-codegen/infra/gcp
+chmod +x setup-foundation.sh setup-public-sites-bucket.sh
+./setup-foundation.sh</code></pre>
+    </div>
+
+    <!-- ========== PHASE B ========== -->
+    <h2 id="phase-b">Phase B — GCS buckets</h2>
+    <div class="card">
+      <table>
+        <tr><th>Bucket</th><th>Purpose</th></tr>
+        <tr><td><code>bexo-portfolios</code></td><td>Private: audit copy of portfolio.md</td></tr>
+        <tr><td><code>bexo-sites-public</code></td><td>Public read: live sites (index.html, _next/, data.json)</td></tr>
+      </table>
+      <pre><code>./setup-public-sites-bucket.sh</code></pre>
+      <p>Grant Cloud Run service account write access to both buckets (foundation script usually does this). Verify:</p>
+      <pre><code>gcloud storage ls gs://bexo-sites-public/
+gcloud storage ls gs://bexo-portfolios/</code></pre>
+    </div>
+
+    <!-- ========== PHASE C ========== -->
+    <h2 id="phase-c">Phase C — Secret Manager (AI + platform)</h2>
+    <div class="card highlight">
+      <p>Create secrets (skip if they already exist; use <code>versions add</code> to update):</p>
+      <pre><code># Required for Claude Code proxy (DeepSeek)
+echo -n "YOUR_DEEPSEEK_KEY" | gcloud secrets create deepseek-api-key --data-file=- 2>/dev/null \
+  || echo -n "YOUR_DEEPSEEK_KEY" | gcloud secrets versions add deepseek-api-key --data-file=-
+
+# Optional: Kimi fix pass
+echo -n "YOUR_KIMI_KEY" | gcloud secrets create kimi-api-key --data-file=- 2>/dev/null \
+  || echo -n "YOUR_KIMI_KEY" | gcloud secrets versions add kimi-api-key --data-file=-
+
+# Optional: OpenRouter fallback
+echo -n "sk-or-..." | gcloud secrets create openrouter-api-key --data-file=- 2>/dev/null \
+  || echo -n "sk-or-..." | gcloud secrets versions add openrouter-api-key --data-file=-
+
+# Platform (likely exist already)
+echo -n "$(openssl rand -hex 32)" | gcloud secrets create bexo-internal-secret --data-file=-
+echo -n "https://YOUR.supabase.co" | gcloud secrets create supabase-url --data-file=-
+echo -n "eyJ..." | gcloud secrets create supabase-service-key --data-file=-
+echo -n "github_pat_..." | gcloud secrets create github-token --data-file=-
+echo -n "https://n8n.mybexo.com/webhook/bexo-build-done" | gcloud secrets create n8n-callback-url --data-file=-</code></pre>
+
+      <p><strong>GitHub org (required for portfolio repos):</strong> Cloud Run uses <code>GITHUB_ORG=bexo-sites</code> (not <code>BEXO-DEV</code>). PAT must have <code>repo</code> + <code>workflow</code> scopes; token owner must be a member of <a href="https://github.com/bexo-sites">bexo-sites</a>. Verify before deploy:</p>
+      <pre><code>export GITHUB_TOKEN="$(gcloud secrets versions access latest --secret=github-token --project=$PROJECT_ID)"
+./scripts/verify-github-phase5.sh bexo-sites</code></pre>
+
+      <p>Grant <code>bexo-codegen@</code> access to every secret:</p>
+      <pre><code>SA="bexo-codegen@${PROJECT_ID}.iam.gserviceaccount.com"
+for SECRET in deepseek-api-key kimi-api-key openrouter-api-key github-token \
+  supabase-url supabase-service-key bexo-internal-secret n8n-callback-url; do
+  gcloud secrets add-iam-policy-binding "$SECRET" \
+    --member="serviceAccount:${SA}" \
+    --role="roles/secretmanager.secretAccessor" --quiet 2>/dev/null || true
+done</code></pre>
+    </div>
+
+    <!-- ========== PHASE D ========== -->
+    <h2 id="phase-d">Phase D — Deploy Cloud Run (Claude Code engine)</h2>
+    <div class="card highlight">
+      <h3>D.1 Build and deploy image</h3>
+      <pre><code>cd bexo-codegen
+gcloud builds submit --config=cloudbuild.yaml --project=$PROJECT_ID</code></pre>
+      <p>This builds a Docker image with Node 20, Python, Chromium, Playwright, and <code>@anthropic-ai/claude-code</code>. Deploy sets 4Gi RAM and 300s timeout.</p>
+
+      <h3>D.2 Add Claude proxy environment variables (critical)</h3>
+      <p><code>cloudbuild.yaml</code> maps <code>DEEPSEEK_API_KEY</code> but you must also set the Anthropic-compatible proxy URL and model names on the Cloud Run service:</p>
+      <pre><code>gcloud run services update bexo-codegen \
+  --region=us-central1 \
+  --project=$PROJECT_ID \
+  --update-env-vars="ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic,ANTHROPIC_MODEL=deepseek-chat,ANTHROPIC_DEFAULT_SONNET_MODEL=deepseek-chat,CLAUDE_CODE_SUBAGENT_MODEL=deepseek-chat,CODEGEN_ENGINE=claude,SKIP_CLAUDE=false"</code></pre>
+      <p class="warn">If DeepSeek’s Anthropic bridge URL changes, update <code>ANTHROPIC_BASE_URL</code> per their docs. For template-only test (no Claude CLI billing): set <code>SKIP_CLAUDE=true</code>.</p>
+
+      <h3>D.3 Confirm service URL</h3>
+      <pre><code>gcloud run services describe bexo-codegen --region=us-central1 --format='value(status.url)'</code></pre>
+      <p>Save this URL — you need it for n8n as <code>CLOUD_RUN_BUILD_URL</code> (append <code>/build</code> only in the workflow body; base URL without path).</p>
+
+      <h3>D.4 Smoke test /build</h3>
+      <pre><code>INTERNAL=$(gcloud secrets versions access latest --secret=bexo-internal-secret)
+URL=$(gcloud run services describe bexo-codegen --region=us-central1 --format='value(status.url)')
+
+curl -X POST "${URL}/build" \
+  -H "Content-Type: application/json" \
+  -H "X-BEXO-Internal-Secret: ${INTERNAL}" \
+  -d '{"profileId":"YOUR_PROFILE_UUID","buildId":"YOUR_BUILD_UUID","handle":"yourhandle"}'</code></pre>
+      <p>First run can take 3–8 minutes (npm install + build). Check logs for <code>GitHub: https://github.com/bexo-sites/portfolio-HANDLE</code> (not <code>GitHub skipped</code>):</p>
+      <pre><code>gcloud run services logs read bexo-codegen --region=us-central1 --limit=80</code></pre>
+
+      <h3>D.5 Verify GCS output</h3>
+      <pre><code>gsutil ls -l "gs://bexo-sites-public/YOUR_PROFILE_UUID/site/"
+gsutil ls "gs://bexo-sites-public/YOUR_PROFILE_UUID/site/_next/"
+gsutil cat "gs://bexo-sites-public/YOUR_PROFILE_UUID/site/data.json" | head -20</code></pre>
+
+      <h3>Rollback</h3>
+      <p>If Claude path fails, switch to legacy HTML generator:</p>
+      <pre><code>gcloud run services update bexo-codegen --region=us-central1 \
+  --update-env-vars="CODEGEN_ENGINE=python"</code></pre>
+    </div>
+
+    <!-- ========== PHASE E ========== -->
+    <h2 id="phase-e">Phase E — n8n Workflow A</h2>
+    <div class="card">
+      <p><strong>Re-import</strong> the updated workflow (no OpenRouter AI nodes):</p>
+      <p><code>bexo-codegen/infra/n8n/workflows/bexo-portfolio-generate.json</code></p>
+      <p>On your n8n VM, edit <code>~/bexo-n8n/.env</code>:</p>
+      <pre><code>N8N_WEBHOOK_SECRET=&lt;same as BEXO api-server&gt;
+BEXO_INTERNAL_SECRET=&lt;same as GCP bexo-internal-secret&gt;
+SUPABASE_URL=https://xxx.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=eyJ...
+CLOUD_RUN_BUILD_URL=https://bexo-codegen-XXXX.us-central1.run.app
+N8N_BLOCK_ENV_ACCESS_IN_NODE=false</code></pre>
+      <p>Restart n8n:</p>
+      <pre><code>cd ~/bexo-n8n && docker compose -f docker-compose.micro.yml up -d --force-recreate n8n</code></pre>
+      <p>In n8n UI: import workflow → publish. Confirm the <strong>Cloud Run — /build</strong> node timeout is <strong>300000</strong> ms (5 minutes).</p>
+      <p class="ok">You can remove <code>OPENROUTER_API_KEY</code> from n8n for Workflow A — spec is built inside Cloud Run now.</p>
+    </div>
+
+    <!-- ========== PHASE F ========== -->
+    <h2 id="phase-f">Phase F — Cloudflare (live URLs)</h2>
+    <div class="card">
+      <p>Full details: <code>docs/PORTFOLIO-HOSTING-PLAN.md</code></p>
+      <ol>
+        <li>Run <code>setup-public-sites-bucket.sh</code> if not done</li>
+        <li>Create KV namespace → note <code>CLOUDFLARE_KV_NAMESPACE_ID</code></li>
+        <li>Deploy worker from <code>infra/cloudflare/worker/</code> (wrangler)</li>
+        <li>Wildcard DNS <code>*.mybexo.com</code> → Worker route</li>
+        <li>Workflow B writes handle → profileId to KV on build success</li>
+      </ol>
+      <pre><code>cd bexo-codegen/infra/cloudflare/worker
+npx wrangler deploy</code></pre>
+    </div>
+
+    <!-- ========== PHASE G ========== -->
+    <h2 id="phase-g">Phase G — api-server (sync edits without rebuild)</h2>
+    <div class="card">
+      <p>When a student edits a project and the site is already live, the app calls <code>POST /api/portfolio/sync-data</code> to refresh <code>data.json</code> only.</p>
+      <p>On your api-server host / <code>BEXO/.env</code>:</p>
+      <pre><code>GCS_PUBLIC_BUCKET=bexo-sites-public
+# Paste full service account JSON (GCS write to bexo-sites-public):
+GCS_SA_KEY_JSON={"type":"service_account",...}</code></pre>
+      <p>Create a GCP service account with <code>roles/storage.objectAdmin</code> on <code>bexo-sites-public</code>, download JSON key, set as env var. Run <code>pnpm install</code> in api-server (adds <code>@google-cloud/storage</code>).</p>
+    </div>
+
+    <!-- ========== PHASE H ========== -->
+    <h2 id="phase-h">Phase H — Test end-to-end</h2>
+    <div class="card">
+      <ol>
+        <li>Student profile &lt;90% → app shows banner; build returns 403</li>
+        <li>Complete profile → tap <strong>Build My Website</strong> on dashboard</li>
+        <li><code>site_builds.status</code> → <code>building</code> → <code>done</code></li>
+        <li>Open <code>https://handle.mybexo.com</code> — Next.js site loads</li>
+        <li>Edit a project title in app → wait ~3s → refresh site → title updated</li>
+        <li>Optional: <strong>Redesign</strong> in app runs full Cloud Run build again</li>
+      </ol>
+      <p>See also <code>docs/PHASE-8-APP-TEST-CHECKLIST.md</code> and <code>docs/IMPLEMENTATION_VERIFICATION.md</code>.</p>
+    </div>
+
+    <!-- ========== COSTS ========== -->
+    <h2 id="costs">4. Costs (affordable stack)</h2>
+    <div class="card">
+      <table>
+        <tr><th>Service</th><th>When you pay</th><th>Typical</th></tr>
+        <tr><td>Cloud Run</td><td>Only during each build (~3–8 min)</td><td>Cents per build</td></tr>
+        <tr><td>DeepSeek API</td><td>Each Claude Code build</td><td>~$0.10–0.40 per site</td></tr>
+        <tr><td>GCS</td><td>Storage + egress</td><td>Very low per student</td></tr>
+        <tr><td>Cloudflare Worker</td><td>Per request</td><td>Free tier usually enough</td></tr>
+        <tr><td>Content sync</td><td>api-server → GCS write</td><td>~free</td></tr>
+        <tr><td>n8n VM</td><td>Your existing server</td><td>Already running</td></tr>
+      </table>
+      <p><strong>Avoid:</strong> per-student Coolify/Vercel containers — not needed.</p>
+    </div>
+
+    <!-- ========== TROUBLESHOOTING ========== -->
+    <h2 id="trouble">5. Troubleshooting</h2>
+    <div class="card">
+      <table>
+        <tr><th>Problem</th><th>Fix</th></tr>
+        <tr><td>Build times out at 300s</td><td>Check logs; set <code>SKIP_CLAUDE=true</code> to test template-only; ensure 4Gi memory</td></tr>
+        <tr><td>Claude CLI not found</td><td>Redeploy image; Dockerfile installs <code>@anthropic-ai/claude-code</code></td></tr>
+        <tr><td>401 on /build</td><td><code>BEXO_INTERNAL_SECRET</code> must match n8n + Cloud Run</td></tr>
+        <tr><td>403 profile_incomplete</td><td>Expected until app profile ≥90%</td></tr>
+        <tr><td>Site 404 on mybexo.com</td><td>KV missing handle→profileId; run Workflow B callback</td></tr>
+        <tr><td>JS/CSS 404</td><td>Redeploy Cloudflare worker; check <code>_next/static</code> in GCS</td></tr>
+        <tr><td>Edits don’t appear</td><td>Configure api-server <code>GCS_SA_KEY_JSON</code>; site must be <code>done</code></td></tr>
+        <tr><td>npm build fails in container</td><td>Read Cloud Run logs; bump memory; test template locally</td></tr>
+      </table>
+    </div>
+
+    <!-- ========== MASTER CHECKLIST ========== -->
+    <h2 id="checklist">6. Master checklist</h2>
+    <p class="progress-text">Check off steps as you complete them. Progress is saved in this browser.</p>
+
+    <div class="todo-section" id="checklist-root"></div>
+
+    <footer style="margin-top:3rem;padding-top:1.5rem;border-top:1px solid var(--border);color:var(--muted);font-size:0.85rem;">
+      BEXO Portfolio System v2 · <code>bexo-codegen/docs/GCP-CLAUDE-SETUP-GUIDE.html</code> ·
+      Related: AI_MODELS.md, PORTFOLIO-HOSTING-PLAN.md, IMPLEMENTATION_VERIFICATION.md
+    </footer>
+  </div>
+
+  <script>
+    const STORAGE_KEY = "bexo-gcp-claude-checklist-v1";
+    const ITEMS = [
+      { phase: "Prereq", text: "gcloud installed and project set (bexo-prod)" },
+      { phase: "Prereq", text: "DeepSeek API key obtained" },
+      { phase: "GCP", text: "Enable Run, Cloud Build, Artifact Registry, Secret Manager, Storage APIs" },
+      { phase: "GCP", text: "Run infra/gcp/setup-foundation.sh" },
+      { phase: "GCP", text: "Run infra/gcp/setup-public-sites-bucket.sh" },
+      { phase: "GCP", text: "Create/update deepseek-api-key in Secret Manager" },
+      { phase: "GCP", text: "Create/update supabase-url + supabase-service-key secrets" },
+      { phase: "GCP", text: "Create/update bexo-internal-secret (openssl rand -hex 32)" },
+      { phase: "GCP", text: "Create/update n8n-callback-url + github-token secrets" },
+      { phase: "GCP", text: "Grant bexo-codegen@ secretAccessor on all secrets" },
+      { phase: "GCP", text: "gcloud builds submit --config=cloudbuild.yaml" },
+      { phase: "GCP", text: "Set ANTHROPIC_BASE_URL + ANTHROPIC_MODEL on Cloud Run service" },
+      { phase: "GCP", text: "Note Cloud Run URL for n8n CLOUD_RUN_BUILD_URL" },
+      { phase: "GCP", text: "curl POST /build smoke test succeeded" },
+      { phase: "GCP", text: "gsutil ls site/index.html + _next/ + data.json in bexo-sites-public" },
+      { phase: "n8n", text: "Re-import bexo-portfolio-generate.json (v2, no OpenRouter)" },
+      { phase: "n8n", text: "Set BEXO_INTERNAL_SECRET + CLOUD_RUN_BUILD_URL in ~/bexo-n8n/.env" },
+      { phase: "n8n", text: "Restart n8n docker; publish Workflow A" },
+      { phase: "n8n", text: "Confirm Cloud Run node timeout = 300000 ms" },
+      { phase: "n8n", text: "Workflow B (build-done) published with KV + Supabase" },
+      { phase: "CF", text: "Deploy portfolio-proxy worker (wrangler)" },
+      { phase: "CF", text: "Wildcard DNS *.mybexo.com → Worker" },
+      { phase: "CF", text: "Test https://handle.mybexo.com loads" },
+      { phase: "App", text: "api-server: GCS_PUBLIC_BUCKET + GCS_SA_KEY_JSON for sync-data" },
+      { phase: "App", text: "N8N_WEBHOOK_URL + N8N_WEBHOOK_SECRET on api-server" },
+      { phase: "App", text: "Test: profile <90% blocks build" },
+      { phase: "App", text: "Test: profile ≥90% triggers build → site live" },
+      { phase: "App", text: "Test: edit project → site updates without rebuild" },
+    ];
+
+    const phaseClass = { GCP: "gcp", CF: "cf", n8n: "n8n", App: "app", Prereq: "gcp" };
+
+    function loadState() {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+      } catch {
+        return {};
+      }
+    }
+
+    function saveState(state) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    function render() {
+      const state = loadState();
+      const root = document.getElementById("checklist-root");
+      root.innerHTML = "";
+      ITEMS.forEach((item, i) => {
+        const id = "todo-" + i;
+        const done = !!state[id];
+        const div = document.createElement("div");
+        div.className = "todo-item" + (done ? " done" : "");
+        const badge = phaseClass[item.phase] || "gcp";
+        div.innerHTML =
+          '<input type="checkbox" id="' + id + '" ' + (done ? "checked" : "") + ">" +
+          '<label for="' + id + '"><span class="phase">' + item.phase +
+          ' <span class="badge ' + badge + '">' + item.phase + "</span></span>" +
+          item.text + "</label>";
+        root.appendChild(div);
+        div.querySelector("input").addEventListener("change", (e) => {
+          state[id] = e.target.checked;
+          saveState(state);
+          render();
+        });
+      });
+      const doneCount = ITEMS.filter((_, i) => state["todo-" + i]).length;
+      document.getElementById("progress-label").textContent =
+        doneCount + " / " + ITEMS.length + " steps complete";
+      document.getElementById("progress-fill").style.width =
+        (doneCount / ITEMS.length) * 100 + "%";
+    }
+
+    document.getElementById("btn-reset").onclick = () => {
+      if (confirm("Reset all checklist progress?")) {
+        localStorage.removeItem(STORAGE_KEY);
+        render();
+      }
+    };
+
+    document.getElementById("btn-export").onclick = () => {
+      const state = loadState();
+      const done = ITEMS.filter((_, i) => state["todo-" + i]).map((x) => x.text);
+      const pending = ITEMS.filter((_, i) => !state["todo-" + i]).map((x) => x.text);
+      const payload = { done, pending, exportedAt: new Date().toISOString() };
+      navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+      alert("Progress copied to clipboard as JSON");
+    };
+
+    render();
+  </script>
+</body>
+</html>

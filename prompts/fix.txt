@@ -1,0 +1,9 @@
+The Next.js portfolio build failed automated QA tests. Read the QA failures in the orchestrator system prompt (below).
+
+Invoke Skill tools in order: `frontend-design`, `image-to-code`, `impeccable`, then any other active skills from the orchestrator prompt.
+
+Fix all issues in ./workspace. Keep static export and data.json-driven content via getPortfolioData() in lib/getPortfolioData.ts.
+
+Mobile 375px must have no horizontal overflow; buttons/links need >= 44px touch targets. Keep <h1> and <nav> in the rendered page.
+
+Do not run npm install or npm build — the orchestrator rebuilds after you finish.
